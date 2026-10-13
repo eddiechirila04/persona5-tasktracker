@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phantom Tracker</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎭</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,900&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            --p5-red: #e60012;
+            --p5-black: #0f0f0f;
+            --p5-yellow: #fff100;
+        }
+
+        body {
+            background-color: var(--p5-black);
+            color: #ffffff;
+            font-family: 'Montserrat', sans-serif;
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(rgba(255, 0, 0, 0.15) 15%, transparent 16%),
+                radial-gradient(rgba(255, 255, 255, 0.05) 15%, transparent 16%);
+            background-size: 30px 30px;
+            background-position: 0 0, 15px 15px;
+        }
+
+        .p5-card-angle {
+            clip-path: polygon(0 0, 100% 2%, 98% 98%, 1% 100%);
+            transform: rotate(-1deg);
+            transition: all 0.2s ease-in-out;
+        }
+        .p5-card-angle:hover {
+            transform: rotate(0.5deg) scale(1.02);
+        }
+
+        .p5-font-impact {
+            font-family: 'Impact', 'Montserrat', sans-serif;
+            letter-spacing: 1px;
+        }
+
+        .p5-box-shadow {
+            box-shadow: -8px 8px 0px #000000, -12px 12px 0px var(--p5-red);
+        }
+
+        .p5-btn {
+            background-color: var(--p5-red);
+            color: white;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-style: italic;
+            transition: transform 0.1s ease, background-color 0.1s ease;
+            clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
+            display: inline-block;
+        }
+        .p5-btn:hover {
+            background-color: #ffffff;
+            color: #000000;
+            transform: scale(1.05) rotate(-2deg);
+        }
+        .p5-btn:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes splashIn {
+            0% { transform: scale(0.1) rotate(-20deg); opacity: 0; }
+            50% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+            100% { transform: scale(1) rotate(-3deg); opacity: 1; }
+        }
+
+        @keyframes starSpin {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.3); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        .animate-splash {
+            animation: splashIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .star-spin {
+            animation: starSpin 3s infinite linear;
+        }
+
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: var(--p5-red); }
+        ::-webkit-scrollbar-thumb:hover { background: #fff; }
+
+        .stat-knowledge { color: #3b82f6; }
+        .stat-guts { color: #ef4444; }
+        .stat-proficiency { color: #eab308; }
+        .stat-kindness { color: #22c55e; }
+        .stat-charm { color: #ec4899; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative selection:bg-yellow-300 selection:text-black">
+
+    <header class="bg-black border-b-4 border-red-600 sticky top-0 z-40 shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-red-600 text-black px-4 py-1 transform -skew-x-12 font-black text-2xl tracking-wider border-2 border-white">P5</div>
+                <div>
+                    <h1 class="p5-font-impact text-2xl text-white tracking-widest uppercase italic">PHANTOM <span class="text-red-600">TRACKER</span></h1>
+                    <div class="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                        <span>CODE: <span id="phantom-alias" class="text-yellow-400 underline cursor-pointer" onclick="changeAlias()">JOKER</span></span>
+                        <span class="text-red-600">★</span>
+                        <span id="streak-counter" class="text-white">STREAK: 0 DAYS</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 md:gap-4 bg-red-600 px-4 py-2 transform skew-x-6 border-2 border-white shadow-lg">
+                <div id="calendar-date" class="text-black font-black text-xl md:text-2xl tracking-tighter p5-font-impact"></div>
+                <div class="h-6 w-0.5 bg-black"></div>
+                <div id="weather-display" class="text-black font-black flex items-center gap-1 text-lg">
+                    <i class="fa-solid fa-sun text-yellow-300"></i>
+                    <span class="hidden sm:inline">SUNNY</span>
+                </div>
+                <div class="h-6 w-0.5 bg-black"></div>
+                <div id="time-slot" class="bg-black text-yellow-400 px-3 py-1 font-black text-sm uppercase tracking-widest transform -skew-x-6">
+                    UPDATING...
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <button id="sfx-toggle" onclick="toggleAudio()" class="bg-zinc-800 hover:bg-zinc-700 text-white p-2 border-2 border-white font-black text-sm">
+                    <i id="sfx-icon" class="fa-solid fa-volume-high text-yellow-400"></i>
+                </button>
+                <button id="auth-btn" onclick="toggleAuth()" class="bg-zinc-900 hover:bg-blue-600 text-blue-500 hover:text-white px-3 py-2 text-xs font-black uppercase tracking-widest border border-blue-600 transition">
+                    SYNC (LOGIN)
+                </button>
+                <button onclick="resetData()" class="bg-zinc-900 hover:bg-red-700 text-red-500 hover:text-white px-3 py-2 text-xs font-black uppercase tracking-widest border border-red-600 transition">
+                    RESET
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto w-full px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
+
+        <!-- left side -->
+        <section class="lg:col-span-5 space-y-6">
+            <div class="bg-black border-4 border-white p-5 relative overflow-hidden p5-box-shadow">
+                <div class="absolute -right-10 -bottom-10 text-zinc-900 text-9xl font-black select-none pointer-events-none p5-font-impact">P5</div>
+                <div class="flex justify-between items-center mb-4 border-b-2 border-red-600 pb-2">
+                    <h2 class="text-2xl font-black italic text-white p5-font-impact uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-star text-red-600"></i> SOCIAL PARAMETERS
+                    </h2>
+                    <span class="bg-red-600 text-black text-xs font-black px-2 py-0.5 tracking-wider uppercase">RADAR MATRIX</span>
+                </div>
+                <div class="relative w-full aspect-square max-w-[280px] mx-auto my-2">
+                    <canvas id="statsRadarChart"></canvas>
+                </div>
+                <div id="stats-container" class="space-y-3 mt-4"></div>
+            </div>
+
+            <div class="bg-zinc-950 border-4 border-red-600 p-5 relative p5-box-shadow">
+                <div class="flex justify-between items-center mb-3 border-b-2 border-white pb-2">
+                    <h3 class="text-xl font-black italic text-white p5-font-impact uppercase tracking-wider">THIEF CODE & AWARDS</h3>
+                    <span id="rank-title" class="text-yellow-400 font-bold text-xs uppercase bg-black px-2 py-1 border border-yellow-400">NOVICE CAT</span>
+                </div>
+
+                <div class="mb-5 bg-black border border-zinc-700 p-3 italic text-sm text-gray-300 border-l-4 border-l-red-600 relative overflow-hidden group">
+                    <div class="absolute -right-4 -top-4 opacity-10 transform rotate-12 group-hover:rotate-6 transition-transform">
+                        <i class="fa-solid fa-mask text-5xl"></i>
+                    </div>
+                    <span class="text-red-500 font-bold tracking-wider">CREDO:</span>
+                    <span id="thief-code-text" class="ml-1 font-medium">Steal back your time.</span>
+                </div>
+
+                <div class="grid grid-cols-4 gap-3 text-center" id="badges-grid"></div>
+            </div>
+        </section>
+
+        <!-- right side -->
+        <section class="lg:col-span-7 space-y-6">
+
+            <div class="bg-red-600 p-1 border-4 border-white p5-box-shadow relative">
+                <div class="bg-black p-4 border-2 border-black">
+                    <h2 class="text-xl font-black text-white p5-font-impact uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-eye text-red-600"></i> METAVERSE EVALUATOR
+                    </h2>
+                    <p class="text-xs text-gray-400 mb-3 font-bold uppercase tracking-widest">Describe your real-world task. The AI will judge your stat gains.</p>
+
+                    <div class="flex flex-col gap-3">
+                        <textarea id="task-input" rows="2" class="w-full bg-zinc-900 text-white p-3 font-bold text-sm border-2 border-zinc-700 focus:outline-none focus:border-red-600 transition-colors" placeholder="e.g., 'Read a thick book about history' or 'Made dinner'"></textarea>
+
+                        <button onclick="evaluateTask()" class="p5-btn py-3 px-6 w-full text-lg self-end flex justify-center items-center gap-2">
+                            <span>ANALYZE & EXECUTE</span>
+                            <i class="fas fa-bolt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3 border-b-4 border-red-600 pb-3">
+                <div class="flex flex-wrap gap-2" id="filter-buttons">
+                    <button onclick="filterTasks('all')" class="guide-filter-btn px-4 py-1 text-xs font-black uppercase tracking-wider border-2 border-white bg-red-600 text-black" data-filter="all">ALL</button>
+                    <button onclick="filterTasks('knowledge')" class="guide-filter-btn px-4 py-1 text-xs font-black uppercase tracking-wider border-2 border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-black transition-colors" data-filter="knowledge">KNOWLEDGE</button>
+                    <button onclick="filterTasks('guts')" class="guide-filter-btn px-4 py-1 text-xs font-black uppercase tracking-wider border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-black transition-colors" data-filter="guts">GUTS</button>
+                    <button onclick="filterTasks('proficiency')" class="guide-filter-btn px-4 py-1 text-xs font-black uppercase tracking-wider border-2 border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black transition-colors" data-filter="proficiency">PROFICIENCY</button>
+                    <button onclick="filterTasks('kindness')" class="guide-filter-btn px-4 py-1 text-xs font-black uppercase tracking-wider border-2 border-green-500 text-green-500 hover:bg-green-500 hover:text-black transition-colors" data-filter="kindness">KINDNESS</button>
+                    <button onclick="filterTasks('charm')" class="guide-filter-btn px-4 py-1 text-xs font-black uppercase tracking-wider border-2 border-pink-500 text-pink-500 hover:bg-pink-500 hover:text-black transition-colors" data-filter="charm">CHARM</button>
+                </div>
+            </div>
+
+            <div id="tasks-container" class="space-y-4 max-h-[600px] overflow-y-auto pr-2"></div>
+        </section>
+    </main>
+
+    <!-- loading screen -->
+    <div id="p5-loader" class="fixed inset-0 bg-black z-50 flex flex-col justify-between p-8 transition-opacity duration-500">
+        <div class="w-full h-4 bg-red-600 transform -skew-x-12"></div>
+        <div class="flex flex-col items-center justify-center text-center my-auto">
+            <div class="relative w-32 h-32 mb-6 animate-bounce">
+                <div class="absolute inset-0 bg-red-600 transform rotate-45"></div>
+                <div class="absolute inset-2 bg-black transform -rotate-12 flex items-center justify-center">
+                    <i class="fa-solid fa-mask text-5xl text-yellow-400 star-spin"></i>
+                </div>
+            </div>
+            <h2 id="loading-quip" class="p5-font-impact text-3xl md:text-5xl text-white tracking-widest uppercase italic mb-2">
+                LOOKIN' COOL!
+            </h2>
+            <p class="text-xs text-red-500 font-black tracking-widest uppercase bg-zinc-900 px-4 py-1 border border-red-600 inline-block">
+                CHANGING HEARTS & SYNCING COGNITION...
+            </p>
+        </div>
+        <div class="w-full h-4 bg-red-600 transform skew-x-12 flex justify-end items-center px-4">
+            <span class="text-black font-black text-xs">P5-SYNC v2.0</span>
+        </div>
+    </div>
+
+    <!-- rank up popup -->
+    <div id="splash-overlay" class="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4 hidden pointer-events-none transition-opacity duration-300">
+        <div id="splash-card" class="relative bg-red-600 border-8 border-white p-8 max-w-md w-full text-center p5-box-shadow animate-splash transform -rotate-3">
+            <div class="absolute -top-8 -left-8 text-yellow-300 text-5xl star-spin">★</div>
+            <div class="absolute -bottom-8 -right-8 text-yellow-300 text-5xl star-spin">★</div>
+            <div class="bg-black text-yellow-400 font-black text-lg uppercase px-4 py-1 inline-block tracking-widest border border-white mb-3">STAT INCREASED!</div>
+            <h2 id="splash-title" class="p5-font-impact text-5xl text-white tracking-widest uppercase italic my-2 drop-shadow-[0_4px_0_#000]">KNOWLEDGE UP!</h2>
+            <div class="mt-4 bg-white text-black p-3 font-black border-2 border-black tracking-wider uppercase">
+                NEW RANK: <span id="splash-rank-name" class="text-red-600">ENCYCLOPEDIA</span>
+            </div>
+        </div>
+    </div>
+
+    <audio id="bg-music" loop preload="auto" src="audio/beneath-the-mask.mp3"></audio>
+
+    <script>
+        // firebase setup
+        const firebaseConfig = {
+            apiKey: "AIzaSyDUKZ0ZNBcrFXb59qRnTxIM-vcSihh-OL8",
+            authDomain: "persona-5-task-tracker.firebaseapp.com",
+            projectId: "persona-5-task-tracker",
+            storageBucket: "persona-5-task-tracker.firebasestorage.app",
+            messagingSenderId: "694789750288",
+            appId: "1:694789750288:web:0170e65175676ad72c5495",
+            measurementId: "G-XL0EWQPQZ1"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const provider = new firebase.auth.GoogleAuthProvider();
+        let currentUser = null;
+
+        // ai stuff
+        const MODEL_URL = "https://openrouter.ai/api/v1/chat/completions";
+        const OPENROUTER_API_KEY = "YOUR_OPENROUTER_KEY_HERE";
+
+        const STAT_CONFIG = {
+            knowledge: { name: 'Knowledge', icon: 'fa-brain', color: '#3b82f6', ranks: ['Unlearned', 'Scholarly', 'Mighty', 'Encyclopedia', 'Erudite'] },
+            charm: { name: 'Charm', icon: 'fa-wand-magic-sparkles', color: '#ec4899', ranks: ['Existent', 'Possessive', 'Charismatic', 'Smooth Talker', 'Debonair'] },
+            proficiency: { name: 'Proficiency', icon: 'fa-wrench', color: '#eab308', ranks: ['Bumbling', 'Decent', 'Skilled', 'Masterful', 'Transcendent'] },
+            guts: { name: 'Guts', icon: 'fa-bolt', color: '#ef4444', ranks: ['Milquetoast', 'Bold', 'Staunch', 'Dauntless', 'Lionhearted'] },
+            kindness: { name: 'Kindness', icon: 'fa-heart', color: '#22c55e', ranks: ['Inconsiderate', 'Unobtrusive', 'Empathetic', 'Affectionate', 'Angelic'] }
+        };
+
+        // exp needed for each level
+        const EXP_PER_LEVEL = [0, 5, 12, 22, 35, 50];
+        const LOADER_MIN_TIME = 3000;
+        const SAVE_KEY = 'p5_tracker_state_v2';
+
+        function getDefaultState() {
+            return {
+                alias: 'JOKER',
+                stats: {
+                    knowledge: { exp: 0, level: 1 },
+                    charm: { exp: 0, level: 1 },
+                    proficiency: { exp: 0, level: 1 },
+                    guts: { exp: 0, level: 1 },
+                    kindness: { exp: 0, level: 1 }
+                },
+                tasks: []
+            };
+        }
+
+        let state = JSON.parse(localStorage.getItem(SAVE_KEY)) || getDefaultState();
+        let currentFilter = 'all';
+        let audioEnabled = true;
+        let radarChart = null;
+        let loaderShownAt = Date.now();
+
+        const bgMusic = document.getElementById('bg-music');
+        bgMusic.volume = 0.35;
+
+        const quips = [
+            "LOOKIN' COOL!",
+            "TAKE YOUR TIME...",
+            "STEALING BACK YOUR DEADLINE",
+            "CHECKING THE METAVERSE NAVIGATION",
+            "REFORMING COGNITIVE PROCRASTINATION",
+            "DEFEATING THE SHADOW OF LAZINESS"
+        ];
+
+        const thiefCodes = [
+            "Take your time, but don't waste it.",
+            "A phantom thief always leaves a calling card.",
+            "Justice isn't given, it's taken.",
+            "Rebel against the apathy of society.",
+            "Change their hearts, starting with your own.",
+            "The world is not as it should be.",
+            "Show me your true form!"
+        ];
+
+        // loader
+        function showLoader(text) {
+            const loader = document.getElementById('p5-loader');
+            document.getElementById('loading-quip').innerText = text || quips[Math.floor(Math.random() * quips.length)];
+
+            loader.classList.remove('hidden');
+            loader.style.opacity = '1';
+            loaderShownAt = Date.now();
+        }
+
+        function hideLoader() {
+            const loader = document.getElementById('p5-loader');
+            const timeLeft = Math.max(0, LOADER_MIN_TIME - (Date.now() - loaderShownAt));
+
+            setTimeout(function () {
+                loader.style.opacity = '0';
+                setTimeout(function () {
+                    loader.classList.add('hidden');
+                }, 500);
+            }, timeLeft);
+        }
+
+        // login
+        auth.onAuthStateChanged(function (user) {
+            const authBtn = document.getElementById('auth-btn');
+
+            if (user) {
+                currentUser = user;
+                authBtn.innerText = 'LOGGED IN';
+                authBtn.classList.replace('text-blue-500', 'text-green-400');
+                authBtn.classList.replace('border-blue-600', 'border-green-500');
+                authBtn.classList.replace('hover:bg-blue-600', 'hover:bg-green-600');
+
+                showLoader("SYNCING COGNITIVE DATA...");
+                db.collection('users').doc(user.uid).get()
+                    .then(function (doc) {
+                        if (doc.exists) {
+                            state = doc.data();
+                        } else {
+                            saveState();
+                        }
+                        updateUI();
+                        hideLoader();
+                    })
+                    .catch(function () {
+                        hideLoader();
+                    });
+            } else {
+                currentUser = null;
+                authBtn.innerText = 'SYNC (LOGIN)';
+                authBtn.classList.replace('text-green-400', 'text-blue-500');
+                authBtn.classList.replace('border-green-500', 'border-blue-600');
+                authBtn.classList.replace('hover:bg-green-600', 'hover:bg-blue-600');
+
+                state = JSON.parse(localStorage.getItem(SAVE_KEY)) || getDefaultState();
+                updateUI();
+            }
+        });
+
+        function toggleAuth() {
+            if (currentUser) {
+                auth.signOut();
+            } else {
+                auth.signInWithPopup(provider).catch(function (err) {
+                    alert("Login failed: " + err.message);
+                });
+            }
+        }
+
+        // saving
+        function saveState() {
+            localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+
+            if (currentUser) {
+                db.collection('users').doc(currentUser.uid).set(state)
+                    .catch(function (err) {
+                        console.error("Firebase sync error:", err);
+                    });
+            }
+        }
+
+        function resetData() {
+            if (confirm("Wipe all Metaverse data? This cannot be undone.")) {
+                state = getDefaultState();
+                saveState();
+                updateUI();
+            }
+        }
+
+        function changeAlias() {
+            const newAlias = prompt("Enter a new code name:", state.alias);
+            if (newAlias && newAlias.trim() !== '') {
+                state.alias = newAlias.trim().toUpperCase();
+                saveState();
+                updateUI();
+            }
+        }
+
+        // header date + time
+        function updateRealTime() {
+            const now = new Date();
+            const hours = now.getHours();
+            let timeSlot = '';
+
+            if (hours >= 6 && hours < 11) timeSlot = 'MORNING';
+            else if (hours >= 11 && hours < 13) timeSlot = 'LUNCHTIME';
+            else if (hours >= 13 && hours < 15) timeSlot = 'AFTERNOON';
+            else if (hours >= 15 && hours < 18) timeSlot = 'AFTER SCHOOL';
+            else if (hours >= 18 && hours < 21) timeSlot = 'EVENING';
+            else timeSlot = 'LATE NIGHT';
+
+            document.getElementById('time-slot').innerText = timeSlot;
+
+            const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+            const dateText = (now.getMonth() + 1) + '/' + now.getDate() + ' [' + days[now.getDay()] + ']';
+            document.getElementById('calendar-date').innerText = dateText;
+        }
+
+        setInterval(updateRealTime, 60000);
+
+        // music
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const icon = document.getElementById('sfx-icon');
+
+            if (audioEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-yellow-400';
+                bgMusic.play().catch(function () {});
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-gray-500';
+                bgMusic.pause();
+            }
+        }
+
+        function startMusic() {
+            if (!audioEnabled) return;
+
+            bgMusic.play().catch(function () {
+                // browser blocks autoplay so wait for a click
+                function playOnClick() {
+                    if (audioEnabled) bgMusic.play().catch(function () {});
+                }
+                document.addEventListener('click', playOnClick, { once: true });
+                document.addEventListener('keydown', playOnClick, { once: true });
+            });
+        }
+
+        // radar chart
+        function initRadarChart() {
+            const ctx = document.getElementById('statsRadarChart').getContext('2d');
+            const labels = Object.keys(STAT_CONFIG).map(function (k) {
+                return STAT_CONFIG[k].name.toUpperCase();
+            });
+            const levels = Object.keys(STAT_CONFIG).map(function (k) {
+                return state.stats[k].level;
+            });
+
+            radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: levels,
+                        backgroundColor: 'rgba(230, 0, 18, 0.45)',
+                        borderColor: '#ffffff',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#fff100',
+                        pointBorderColor: '#000000'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            min: 0,
+                            max: 5,
+                            ticks: { display: false },
+                            grid: { color: 'rgba(255, 255, 255, 0.2)' },
+                            angleLines: { color: '#e60012', lineWidth: 2 },
+                            pointLabels: { color: '#ffffff', font: { family: 'Impact', size: 12 } }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // stat bars
+        function renderStats() {
+            const container = document.getElementById('stats-container');
+            container.innerHTML = '';
+
+            Object.keys(STAT_CONFIG).forEach(function (key) {
+                const conf = STAT_CONFIG[key];
+                const stat = state.stats[key];
+
+                // how far through the current level the user is
+                const levelStart = EXP_PER_LEVEL[stat.level - 1] || 0;
+                const levelEnd = EXP_PER_LEVEL[stat.level] || EXP_PER_LEVEL[5];
+                let percent = ((stat.exp - levelStart) / (levelEnd - levelStart)) * 100;
+                percent = Math.min(100, Math.max(0, percent));
+
+                container.insertAdjacentHTML('beforeend', `
+                    <div class="bg-zinc-900 border-2 border-zinc-700 p-2.5 relative overflow-hidden">
+                        <div class="flex justify-between items-center mb-1">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid ${conf.icon} text-sm" style="color:${conf.color}"></i>
+                                <span class="font-black text-sm uppercase text-white">${conf.name}</span>
+                            </div>
+                            <div class="text-xs font-black">
+                                <span class="text-yellow-400">RANK ${stat.level}</span>
+                                <span class="text-gray-400 font-normal"> / 5 (${conf.ranks[stat.level - 1]})</span>
+                            </div>
+                        </div>
+                        <div class="w-full bg-black h-3 border border-zinc-700 relative">
+                            <div class="h-full transition-all duration-500" style="width: ${percent}%; background-color: ${conf.color};"></div>
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
+        // send task to the ai and add it
+        async function evaluateTask() {
+            const inputField = document.getElementById('task-input');
+            const input = inputField.value.trim();
+
+            if (!input) {
+                alert("Please describe a task first!");
+                return;
+            }
+
+            showLoader("ANALYZING METAVERSE COGNITION...");
+
+            try {
+                const response = await fetch(MODEL_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + OPENROUTER_API_KEY,
+                        "HTTP-Referer": window.location.href,
+                        "X-Title": "Phantom Tracker"
+                    },
+                    body: JSON.stringify({
+                        model: "openrouter/free",
+                        messages: [
+                            {
+                                role: "system",
+                                content: "You are an AI that strictly outputs valid JSON matching this exact format: {\"taskName\": \"string\", \"boosts\": {\"knowledge\": 0, \"charm\": 0, \"proficiency\": 0, \"guts\": 0, \"kindness\": 0}}. Assign integer boost values between 1 and 3 only for stats that fit the task, and 0 for others. Do not include any markdown formatting like ```json or conversational text."
+                            },
+                            { role: "user", content: input }
+                        ],
+                        temperature: 0.1,
+                        stream: false
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error.message || JSON.stringify(data.error));
+                }
+
+                let text = data.choices[0].message.content;
+                text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+                let result;
+                try {
+                    result = JSON.parse(text);
+                } catch (e) {
+                    console.warn("AI didn't return json, using backup:", text);
+
+                    // guess the stats from keywords
+                    let boosts = { knowledge: 1, guts: 0, proficiency: 0, kindness: 0, charm: 0 };
+                    const lower = input.toLowerCase();
+
+                    if (lower.includes('movie') || lower.includes('date') || lower.includes('hangout')) {
+                        boosts = { knowledge: 0, guts: 0, proficiency: 0, kindness: 0, charm: 2 };
+                    } else if (lower.includes('code') || lower.includes('build') || lower.includes('fix')) {
+                        boosts = { knowledge: 0, guts: 0, proficiency: 2, kindness: 0, charm: 0 };
+                    }
+
+                    result = { taskName: input, boosts: boosts };
+                }
+
+                // keep boosts from going over 3
+                if (result.boosts) {
+                    Object.keys(result.boosts).forEach(function (stat) {
+                        if (result.boosts[stat] > 3) result.boosts[stat] = 3;
+                    });
+                }
+
+                const boosts = result.boosts || { knowledge: 1, guts: 0, proficiency: 0, kindness: 0, charm: 0 };
+
+                state.tasks.unshift({
+                    id: Date.now().toString(),
+                    title: result.taskName || input,
+                    boosts: boosts,
+                    date: document.getElementById('calendar-date').innerText,
+                    time: document.getElementById('time-slot').innerText
+                });
+
+                Object.keys(boosts).forEach(function (stat) {
+                    if (boosts[stat] > 0 && state.stats[stat]) {
+                        addStatEXP(stat, boosts[stat]);
+                    }
+                });
+
+                inputField.value = '';
+                saveState();
+                updateUI();
+            } catch (err) {
+                console.error("Evaluation Error:", err);
+                alert("Metaverse connection failed: " + err.message);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        function addStatEXP(statKey, amount) {
+            const stat = state.stats[statKey];
+            const oldLevel = stat.level;
+
+            stat.exp += amount;
+
+            while (stat.level < 5 && stat.exp >= EXP_PER_LEVEL[stat.level]) {
+                stat.level++;
+            }
+
+            if (stat.level > oldLevel) {
+                showSplash(statKey, stat.level);
+            }
+        }
+
+        // task filters
+        function filterTasks(filter) {
+            currentFilter = filter;
+
+            document.querySelectorAll('.guide-filter-btn').forEach(function (btn) {
+                if (btn.dataset.filter === filter) {
+                    btn.classList.add('bg-white', 'text-black');
+                    btn.classList.remove('text-blue-500', 'text-red-500', 'text-yellow-500', 'text-green-500', 'text-pink-500');
+                } else {
+                    btn.classList.remove('bg-white', 'text-black');
+                }
+            });
+
+            renderTasks();
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('tasks-container');
+            container.innerHTML = '';
+
+            let filtered = state.tasks;
+            if (currentFilter !== 'all') {
+                filtered = state.tasks.filter(function (t) {
+                    return t.boosts[currentFilter] > 0;
+                });
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="bg-zinc-900 border-2 border-dashed border-zinc-700 p-8 text-center text-gray-500 font-black tracking-widest uppercase">NO TARGETS IN THIS CATEGORY</div>`;
+                return;
+            }
+
+            filtered.forEach(function (task) {
+                let tags = '';
+                Object.keys(task.boosts).forEach(function (stat) {
+                    if (task.boosts[stat] > 0) {
+                        tags += `<span class="text-[10px] font-black uppercase px-2 py-0.5 border border-zinc-600 stat-${stat}">+${task.boosts[stat]} ${stat}</span> `;
+                    }
+                });
+
+                container.insertAdjacentHTML('beforeend', `
+                    <div class="p5-card-angle border-4 p-4 relative bg-black border-red-600 shadow-lg">
+                        <div class="flex justify-between">
+                            <div>
+                                <h3 class="font-black text-lg text-white p5-font-impact tracking-wide">${task.title}</h3>
+                                <div class="mt-2 flex gap-2 flex-wrap">${tags}</div>
+                            </div>
+                            <div class="text-right text-xs font-black text-gray-500">
+                                <div>${task.date}</div>
+                                <div>${task.time}</div>
+                                <button onclick="deleteTask('${task.id}')" class="mt-2 text-red-600 hover:text-white"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
+        // deleting a task takes the exp back
+        function deleteTask(id) {
+            const task = state.tasks.find(function (t) {
+                return t.id === id;
+            });
+            if (!task) return;
+
+            if (task.boosts) {
+                Object.keys(task.boosts).forEach(function (statKey) {
+                    const amount = task.boosts[statKey];
+
+                    if (amount > 0 && state.stats[statKey]) {
+                        const stat = state.stats[statKey];
+                        stat.exp = Math.max(0, stat.exp - amount);
+
+                        while (stat.level > 1 && stat.exp < EXP_PER_LEVEL[stat.level - 1]) {
+                            stat.level--;
+                        }
+                    }
+                });
+            }
+
+            state.tasks = state.tasks.filter(function (t) {
+                return t.id !== id;
+            });
+
+            saveState();
+            updateUI();
+        }
+
+        // rank up popup
+        function showSplash(statKey, newLevel) {
+            const overlay = document.getElementById('splash-overlay');
+            document.getElementById('splash-title').innerText = STAT_CONFIG[statKey].name.toUpperCase() + ' UP!';
+            document.getElementById('splash-rank-name').innerText = STAT_CONFIG[statKey].ranks[newLevel - 1].toUpperCase();
+
+            overlay.classList.remove('hidden');
+            overlay.style.opacity = '1';
+
+            setTimeout(function () {
+                overlay.style.opacity = '0';
+                setTimeout(function () {
+                    overlay.classList.add('hidden');
+                }, 300);
+            }, 2200);
+        }
+
+        // badges + title
+        function renderBadges() {
+            const levels = Object.keys(state.stats).map(function (k) {
+                return state.stats[k].level;
+            });
+            const maxLevel = Math.max(...levels);
+            const totalTasks = state.tasks ? state.tasks.length : 0;
+
+            const titles = ['NOVICE CAT', 'TRICKSTER', 'PHANTOM THIEF', 'PHANTOM LEADER', 'JOKER SUPREME'];
+            document.getElementById('rank-title').innerText = titles[Math.min(maxLevel - 1, titles.length - 1)];
+
+            const codeText = document.getElementById('thief-code-text');
+            if (!codeText.dataset.set) {
+                codeText.innerText = thiefCodes[Math.floor(Math.random() * thiefCodes.length)];
+                codeText.dataset.set = 'true';
+            }
+
+            const badges = [
+                { unlocked: totalTasks > 0, icon: 'fa-mask', unlockedColor: 'text-red-500', name: 'Initiation', desc: 'Complete your first task in the Metaverse.' },
+                { unlocked: totalTasks >= 5, icon: 'fa-calendar-check', unlockedColor: 'text-blue-400', name: 'Routine', desc: 'Complete 5 tasks successfully.' },
+                { unlocked: maxLevel >= 3, icon: 'fa-star', unlockedColor: 'text-yellow-400', name: 'Specialist', desc: 'Reach Level 3 in any parameter.' },
+                { unlocked: maxLevel >= 5, icon: 'fa-crown', unlockedColor: 'text-yellow-500', name: 'Mastery', desc: 'Max out a parameter to Level 5.' }
+            ];
+
+            const grid = document.getElementById('badges-grid');
+            grid.innerHTML = '';
+
+            badges.forEach(function (b) {
+                const borderClass = b.unlocked ? 'border-white bg-zinc-900 shadow-[0_0_8px_rgba(255,0,0,0.6)]' : 'border-zinc-800 bg-black opacity-40';
+                const iconColor = b.unlocked ? b.unlockedColor : 'text-gray-600';
+                const nameColor = b.unlocked ? 'text-white' : 'text-gray-600';
+                const status = b.unlocked
+                    ? '<div class="mt-1 text-yellow-300 font-black">UNLOCKED</div>'
+                    : '<div class="mt-1 text-zinc-300 font-black">LOCKED</div>';
+
+                grid.insertAdjacentHTML('beforeend', `
+                    <div class="relative group cursor-pointer flex flex-col items-center">
+                        <div class="w-12 h-12 rounded-full border-2 ${borderClass} flex items-center justify-center transition-all duration-300 p5-card-angle hover:scale-110">
+                            <i class="fa-solid ${b.icon} text-xl ${iconColor}"></i>
+                        </div>
+                        <span class="text-[9px] mt-2 font-black uppercase tracking-widest ${nameColor}">${b.name}</span>
+
+                        <div class="absolute bottom-full mb-2 hidden group-hover:block w-36 bg-red-600 text-white text-[10px] p-2 text-center p5-box-shadow z-20 pointer-events-none transform -rotate-1">
+                            <strong class="text-xs uppercase tracking-wider block border-b border-white mb-1 pb-1">${b.name}</strong>
+                            <span class="font-semibold">${b.desc}</span>
+                            ${status}
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
+        function updateUI() {
+            document.getElementById('phantom-alias').innerText = state.alias || 'JOKER';
+            renderStats();
+            renderTasks();
+            renderBadges();
+
+            if (radarChart) {
+                radarChart.data.datasets[0].data = Object.keys(STAT_CONFIG).map(function (k) {
+                    return state.stats[k].level;
+                });
+                radarChart.update();
+            }
+        }
+
+        function initApp() {
+            updateRealTime();
+            initRadarChart();
+            updateUI();
+            filterTasks('all');
+            hideLoader();
+            startMusic();
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
